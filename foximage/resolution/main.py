@@ -1,13 +1,11 @@
 from PIL import Image
-import os
-import glob
-from multiprocessing import Process
 
 
-def find_square(image: Image.Image) -> list[int]:  # returns a list of the size of the squares
+def find_square(image: Image.Image, max_length: int = 10) -> list[int]:  # returns a list of the size of the squares
     """
     Finds the size of the squares present in the image.
     :param image: image object to process.
+    :param max_length: maximum number of square to find.
     :return: list of the size of the squares.
     """
     square_list = []
@@ -51,7 +49,7 @@ def find_square(image: Image.Image) -> list[int]:  # returns a list of the size 
                 else:
                     continue
             square_list.append(ly1 + 1)
-            if len(square_list) == 10:
+            if len(square_list) == max_length:
                 return square_list
     return square_list
 
@@ -64,11 +62,8 @@ def fix(image: Image.Image, save: bool = False, file_name: str = "image") -> Ima
     :param file_name: output file name.
     :return: fixed image.
     """
-    process_pid = os.getpid()
-    square_list = find_square(image)
+    square_list = find_square(image)  # find
     pixel_width = most_frequent(square_list)
-
-    print(f"Process {process_pid} is running.\n")
 
     if pixel_width == 1:
         print(f"{file_name} is already at the right resolution.\n")
@@ -83,12 +78,14 @@ def fix(image: Image.Image, save: bool = False, file_name: str = "image") -> Ima
 
     image_px = cropped_image.load()
 
+    # created a new blank image
     fixed_img = Image.new(
         mode='RGBA',
         size=(new_width // pixel_width, new_height // pixel_width)
     )
     fixed_img_px = fixed_img.load()
 
+    # copy pixels of the original image
     xi = 0
     for x in range(fixed_img.width):
         yi = 0
@@ -97,12 +94,11 @@ def fix(image: Image.Image, save: bool = False, file_name: str = "image") -> Ima
             yi += pixel_width
         xi += pixel_width
 
+    # save the image if :param save: is True
     if save:
         new_file_name = "resized_" + file_name + ".png"
         fixed_img.save(new_file_name)
         print(f"{new_file_name} created !\n")
-
-    print(f"Process {process_pid} is done.")
 
     return fixed_img
 
@@ -116,50 +112,10 @@ def most_frequent(input_list):
     counter = 0
     num = input_list[0]
 
-    for i in input_list:
-        curr_frequency = input_list.count(i)
+    for element in input_list:
+        curr_frequency = input_list.count(element)
         if curr_frequency > counter:
             counter = curr_frequency
-            num = i
+            num = element
 
     return num
-
-
-# FIXME:
-if __name__ == '__main__':  # if we're running file directly and not importing it as a module
-    while True:
-        inp = input("""Convert an specific file (1) or every image in this directory (2) ?
-        >> """)
-        if inp == "1":
-            path = input("""Path of the image/folder
-    >> """)
-            try:
-                img = Image.open(path)
-            except Exception as e:
-                input(e)
-            else:
-                fix(image=img, file_name=path, save=True)
-
-        elif inp == "2":
-            processes = []
-            ext = str
-            while True:
-                ext = input("Extention des images ?\n\t>> ")
-                if ext not in ['png', 'jpg']:
-                    os.system('cls')
-                    print("Extention not supported.\n")
-                else:
-                    break
-
-            for filename in glob.glob(f'*.{ext}'):
-                img = Image.open(filename)
-                p = Process(target=fix, args=(img, True, filename))
-                p.start()
-                processes.append(p)
-            for p in processes:
-                p.join()
-            else:
-                input("Everything done !")
-                exit(0)
-        else:
-            os.system('cls')
