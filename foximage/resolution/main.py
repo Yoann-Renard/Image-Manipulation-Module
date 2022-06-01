@@ -1,14 +1,18 @@
 from PIL import Image
 import os
-import sys
 import glob
 from multiprocessing import Process
 
 
-def find_square(img) -> list():
+def find_square(image: Image.Image) -> list[int]:  # returns a list of the size of the squares
+    """
+    Finds the size of the squares present in the image.
+    :param image: image object to process.
+    :return: list of the size of the squares.
+    """
     square_list = []
-    for y in range(round(img.height * 1 / 4), round(img.height * 3 / 4)):
-        for x in range(round(img.width * 1 / 4), round(img.width * 3 / 4)):
+    for y in range(round(image.height * 1 / 4), round(image.height * 3 / 4)):
+        for x in range(round(image.width * 1 / 4), round(image.width * 3 / 4)):
             cy = y
             cx = x
             ly1 = 0
@@ -16,11 +20,11 @@ def find_square(img) -> list():
             ly2 = 0
             lx2 = 0
 
-            while cy + 1 < img.height and img.getpixel((cx, cy)) == img.getpixel((cx, cy + 1)):
+            while cy + 1 < image.height and image.getpixel((cx, cy)) == image.getpixel((cx, cy + 1)):
                 cy += 1
                 ly1 += 1
 
-            while cx + 1 < img.width and img.getpixel((cx, cy)) == img.getpixel((cx + 1, cy)):
+            while cx + 1 < image.width and image.getpixel((cx, cy)) == image.getpixel((cx + 1, cy)):
                 cx += 1
                 lx1 += 1
             else:
@@ -29,7 +33,7 @@ def find_square(img) -> list():
                 else:
                     continue
 
-            while cy - 1 >= 0 and img.getpixel((cx, cy)) == img.getpixel((cx, cy - 1)):
+            while cy - 1 >= 0 and image.getpixel((cx, cy)) == image.getpixel((cx, cy - 1)):
                 cy -= 1
                 ly2 += 1
             else:
@@ -38,7 +42,7 @@ def find_square(img) -> list():
                 else:
                     continue
 
-            while cx - 1 >= 0 and img.getpixel((cx, cy)) == img.getpixel((cx - 1, cy)):
+            while cx - 1 >= 0 and image.getpixel((cx, cy)) == image.getpixel((cx - 1, cy)):
                 cx -= 1
                 lx2 += 1
             else:
@@ -52,29 +56,32 @@ def find_square(img) -> list():
     return square_list
 
 
-def fix_resolution(img, filename):
-    imgpx = img.load()
+def fix(image: Image.Image, save: bool = False, file_name: str = "image") -> Image.Image:
+    """
+    Fixes the resolution of the image.
+    :param image: image to fix.
+    :param save: if True, saves the image.
+    :param file_name: output file name.
+    :return: fixed image.
+    """
     process_pid = os.getpid()
-    pixel_width = 0
+    square_list = find_square(image)
+    pixel_width = most_frequent(square_list)
 
     print(f"Process {process_pid} is running.\n")
 
-    square_list = find_square(img)
+    if pixel_width == 1:
+        print(f"{file_name} is already at the right resolution.\n")
+        return image
 
-    pixel_width = most_frequent(square_list)
+    new_width, new_height = image.size
+    if image.width % pixel_width > 0:
+        new_width -= image.width % pixel_width
+    if image.height % pixel_width > 0:
+        new_height -= image.height % pixel_width
+    cropped_image = image.crop((0, 0, new_width, new_height))
 
-    if pixel_width - 1 == 0:
-        print(f"{filename} is already at the right resolution.\n")
-        exit(0)
-
-    ''''''
-
-    new_width, new_height = img.size
-    if img.width % pixel_width > 0:
-        new_width -= img.width % pixel_width
-    if img.height % pixel_width > 0:
-        new_height -= img.height % pixel_width
-    img = img.crop((0, 0, new_width, new_height))
+    image_px = cropped_image.load()
 
     fixed_img = Image.new(
         mode='RGBA',
@@ -86,33 +93,40 @@ def fix_resolution(img, filename):
     for x in range(fixed_img.width):
         yi = 0
         for y in range(fixed_img.height):
-            fixed_img_px[x, y] = imgpx[xi, yi]
+            fixed_img_px[x, y] = image_px[xi, yi]
             yi += pixel_width
         xi += pixel_width
 
-    new_file_name = "resized_" + filename
-    fixed_img.save(new_file_name)
+    if save:
+        new_file_name = "resized_" + file_name + ".png"
+        fixed_img.save(new_file_name)
+        print(f"{new_file_name} created !\n")
 
     print(f"Process {process_pid} is done.")
-    print(f"{new_file_name} created !\n")
 
-    exit(0)
+    return fixed_img
 
 
-def most_frequent(List):
+def most_frequent(input_list):
+    """
+    Returns the most frequent value in the list.
+    :param input_list: list to process.
+    :return: most frequent value.
+    """
     counter = 0
-    num = List[0]
+    num = input_list[0]
 
-    for i in List:
-        curr_frequency = List.count(i)
-        if (curr_frequency > counter):
+    for i in input_list:
+        curr_frequency = input_list.count(i)
+        if curr_frequency > counter:
             counter = curr_frequency
             num = i
 
     return num
 
 
-if __name__ == '__main__':
+# FIXME:
+if __name__ == '__main__':  # if we're running file directly and not importing it as a module
     while True:
         inp = input("""Convert an specific file (1) or every image in this directory (2) ?
         >> """)
@@ -121,11 +135,10 @@ if __name__ == '__main__':
     >> """)
             try:
                 img = Image.open(path)
-                imgpx = img.load()
             except Exception as e:
                 input(e)
             else:
-                fix_resolution(img, path)
+                fix(image=img, file_name=path, save=True)
 
         elif inp == "2":
             processes = []
@@ -140,7 +153,7 @@ if __name__ == '__main__':
 
             for filename in glob.glob(f'*.{ext}'):
                 img = Image.open(filename)
-                p = Process(target=fix_resolution, args=(img, filename))
+                p = Process(target=fix, args=(img, True, filename))
                 p.start()
                 processes.append(p)
             for p in processes:

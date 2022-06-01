@@ -1,3 +1,3 @@
 # Image-Manipulation-Scripts
 
-A set of useful image manipulation scripts.
+A set of useful image manipulation modules.
